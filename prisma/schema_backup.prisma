@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELED
+}
+
+enum PaymentStatus {
+  REQUESTING
+  PENDING
+  PAID
+  PAID_REVIEW
+  FAILED
+  UNKNOWN
+  REVIEW
+  REFUND_PENDING
+  REFUNDED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  phone         String?   @unique
+  image         String?
+  role          Role      @default(USER)
+  accounts      Account[]
+  addresses     Address[]
+  orders        Order[]
+  createdAt     DateTime  @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  phone     String
+  codeHash  String
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([phone])
+}
+
+model Category {
+  id       String     @id @default(cuid())
+  name     String
+  slug     String     @unique
+  parentId String?
+  parent   Category?  @relation("sub", fields: [parentId], references: [id])
+  children Category[] @relation("sub")
+  products Product[]
+}
+
+model Product {
+  id           String           @id @default(cuid())
+  title        String
+  slug         String           @unique
+  description  String?
+  price        Int
+  discount     Int              @default(0)
+  stock        Int              @default(0)
+  images       String[]
+  colors       String[]         @default([])
+  display      String?
+  processor    String?
+  rearCameras  Int[]            @default([])
+
+  brandId      String?
+  brandData    Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+
+  categoryId   String
+  category     Category         @relation(fields: [categoryId], references: [id])
+
+  items        OrderItem[]
+  createdAt    DateTime         @default(now())
+  filterValues Json             @default("{}")
+  customFields Json             @default("{}")
+  options      ProductOption[]
+  variants     ProductVariant[]
+
+  @@index([brandId])
+}
+
+model SimNumber {
+  id     String      @id @default(cuid())
+  number String      @unique
+  price  Int
+  type   String?
+  sold   Boolean     @default(false)
+  items  OrderItem[]
+}
+
+model Address {
+  id         String  @id @default(cuid())
+  userId     String
+  title      String
+  province   String
+  city       String
+  street     String
+  postalCode String
+  phone      String
+  user       User    @relation(fields: [userId], references: [id])
+  orders     Order[]
+}
+
+model Order {
+  id                 String      @id @default(cuid())
+  userId             String
+  addressId          String
+  total              Int
+  status             OrderStatus @default(PENDING)
+  authority          String?
+  paymentRequestedAt DateTime?
+  createdAt          DateTime    @default(now())
+
+  user     User        @relation(fields: [userId], references: [id])
+  address  Address     @relation(fields: [addressId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+}
+
+model OrderItem {
+  id        String          @id @default(cuid())
+  orderId   String
+  productId String?
+  simId     String?
+  qty       Int             @default(1)
+  price     Int
+  order     Order           @relation(fields: [orderId], references: [id])
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sim       SimNumber?      @relation(fields: [simId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+}
+
+model ProductOption {
+  id        String @id @default(cuid())
+  productId String
+  name      String
+  position  Int    @default(0)
+
+  product Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values  ProductOptionValue[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, name])
+}
+
+model ProductOptionValue {
+  id       String  @id @default(cuid())
+  optionId String
+  value    String
+  label    String
+  colorHex String?
+  position Int     @default(0)
+
+  option        ProductOption        @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  variantValues VariantOptionValue[]
+
+  @@unique([optionId, value])
+}
+
+model ProductVariant {
+  id             String  @id @default(cuid())
+  productId      String
+  combinationKey String
+  price          Int
+  discount       Int     @default(0)
+  stock          Int     @default(0)
+  isActive       Boolean @default(true)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  values     VariantOptionValue[]
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, combinationKey])
+  @@index([productId])
+}
+
+model VariantOptionValue {
+  id            String @id @default(cuid())
+  variantId     String
+  optionValueId String
+
+  variant     ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  optionValue ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, optionValueId])
+}
+
+model Payment {
+  id      String        @id @default(cuid())
+  orderId String
+  amount  Int
+  status  PaymentStatus @default(REQUESTING)
+
+  provider  String  @default("ZARINPAL")
+  authority String? @unique
+  refId     String?
+
+  requestedAt   DateTime?
+  verifiedAt    DateTime?
+  lastCheckedAt DateTime?
+  inquiryStartedAt DateTime?
+
+  failureCode    Int?
+  failureMessage String?
+
+  refundRefId String?
+  refundedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, status])
+  @@index([status, createdAt])
+}
