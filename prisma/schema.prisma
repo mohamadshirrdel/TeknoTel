@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Address {
+  id         String  @id
+  userId     String
+  title      String
+  province   String
+  city       String
+  street     String
+  postalCode String
+  phone      String
+  User       User    @relation(fields: [userId], references: [id])
+  Order      Order[]
+  @@index([userId])
+}
+
+model Category {
+  id             String     @id
+  name           String
+  slug           String     @unique
+  parentId       String?
+  Category       Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
+  other_Category Category[] @relation("CategoryToCategory")
+  Product        Product[]
+  @@index([parentId])
+}
+
+model Order {
+  id                 String      @id
+  userId             String
+  addressId          String
+  total              Int
+  status             OrderStatus @default(PENDING)
+  authority          String?
+  createdAt          DateTime    @default(now())
+  paymentRequestedAt DateTime?
+  Address            Address     @relation(fields: [addressId], references: [id])
+  User               User        @relation(fields: [userId], references: [id])
+  OrderItem          OrderItem[]
+  Payment            Payment[]
+  @@index([userId])
+}
+
+model OrderItem {
+  id             String          @id
+  orderId        String
+  productId      String?
+  simId          String?
+  qty            Int             @default(1)
+  price          Int
+  variantId      String?
+  Order          Order           @relation(fields: [orderId], references: [id])
+  Product        Product?        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  SimNumber      SimNumber?      @relation(fields: [simId], references: [id])
+  ProductVariant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OtpCode {
+  id        String   @id
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+model Payment {
+  id               String        @id
+  orderId          String
+  amount           Int
+  status           PaymentStatus @default(REQUESTING)
+  provider         String        @default("ZARINPAL")
+  authority        String?       @unique
+  refId            String?
+  requestedAt      DateTime?
+  verifiedAt       DateTime?
+  lastCheckedAt    DateTime?
+  failureCode      Int?
+  failureMessage   String?
+  refundRefId      String?
+  refundedAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime
+  inquiryStartedAt DateTime?
+  Order            Order         @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, status])
+  @@index([status, createdAt])
+}
+
+model Product {
+  id             String           @id
+  title          String
+  slug           String           @unique
+  description    String?
+  price          Int
+  discount       Int              @default(0)
+  stock          Int              @default(0)
+  images         String[]
+  brand          String?
+  categoryId     String
+  createdAt      DateTime         @default(now())
+  colors         String[]         @default([])
+  customFields   Json             @default("{}")
+  display        String?
+  filterValues   Json             @default("{}")
+  processor      String?
+  rearCameras    Int[]            @default([])
+  OrderItem      OrderItem[]
+  Category       Category         @relation(fields: [categoryId], references: [id])
+  ProductOption  ProductOption[]
+  ProductVariant ProductVariant[]
+  @@index([categoryId])
+}
+
+model ProductOption {
+  id                 String               @id
+  productId          String
+  name               String
+  position           Int                  @default(0)
+  createdAt          DateTime             @default(now())
+  Product            Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ProductOptionValue ProductOptionValue[]
+
+  @@unique([productId, name])
+}
+
+model ProductOptionValue {
+  id                 String               @id
+  optionId           String
+  value              String
+  label              String
+  colorHex           String?
+  position           Int                  @default(0)
+  ProductOption      ProductOption        @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  VariantOptionValue VariantOptionValue[]
+
+  @@unique([optionId, value])
+}
+
+model ProductVariant {
+  id                 String               @id
+  productId          String
+  combinationKey     String
+  price              Int
+  discount           Int                  @default(0)
+  stock              Int                  @default(0)
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  OrderItem          OrderItem[]
+  Product            Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  VariantOptionValue VariantOptionValue[]
+
+  @@unique([productId, combinationKey])
+  @@index([productId])
+}
+
+model SimNumber {
+  id        String      @id
+  number    String      @unique
+  price     Int
+  type      String?
+  sold      Boolean     @default(false)
+  OrderItem OrderItem[]
+}
+
+model User {
+  id            String    @id
+  name          String?
+  email         String?   @unique
+  phone         String?   @unique
+  image         String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  emailVerified DateTime?
+  Account       Account[]
+  Address       Address[]
+  Order         Order[]
+}
+
+model VariantOptionValue {
+  id                 String             @id
+  variantId          String
+  optionValueId      String
+  ProductOptionValue ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+  ProductVariant     ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, optionValueId])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELED
+}
+
+enum PaymentStatus {
+  REQUESTING
+  PENDING
+  PAID
+  FAILED
+  UNKNOWN
+  REVIEW
+  REFUND_PENDING
+  REFUNDED
+  PAID_REVIEW
+}
+
+enum Role {
+  USER
+  ADMIN
+}

@@ -1,6 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,32 +8,62 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
 
-# next.js
+# Next.js
 /.next/
 /out/
 
-# production
+# Production
 /build
 
-# misc
+# Miscellaneous
 .DS_Store
 *.pem
 
-# debug
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Database backups
+*.dump
+*.backup
+*.bak
+
+# SQL backups (except Prisma migrations)
+*.sql
+!prisma/migrations/**/migration.sql
+
+# Uploaded files (user-generated content)
+public/uploads/
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE and AI tools - local settings
+.vscode/*
+!.vscode/extensions.json
+
+.cursor/
+.claude/
+.devin/
+.agents/
+# Generated Prisma Client
+/src/generated/
